@@ -1,0 +1,32 @@
+name: Enforce Issue Mention in PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-issue-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for Closes/Fixes/Resolves or Skip Pattern
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = context.payload.pull_request.title.toLowerCase();
+            const body = context.payload.pull_request.body || "";
+            
+            const skipPatterns = ["hotfix:", "chore:", "docs:"];
+            const shouldSkip = skipPatterns.some(pattern => title.startsWith(pattern));
+            
+            if (shouldSkip) {
+              console.log(`Judul PR mengandung pattern skip ('${title}'). Pengecekan issue diabaikan.`);
+              return;
+            }
+
+            const regex = /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#\d+/i;
+            
+            if (!regex.test(body)) {
+              core.setFailed("PR ini harus menyertakan nomor issue di deskripsi! (Contoh: 'Closes #17'). Gunakan awalan 'hotfix:' atau 'chore:' pada judul PR jika tidak ada tiket.");
+            } else {
+              console.log("Nomor issue ditemukan. Aman untuk dilanjutkan.");
+            }
