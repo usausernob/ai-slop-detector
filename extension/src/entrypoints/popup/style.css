@@ -1,0 +1,22 @@
+/* TODO: styling */
+* {
+    padding: 0px;
+    margin: 0px;
+}
+
+.container {
+    padding: 1rem;
+    min-width: 300px;
+}
+
+.btn-group {
+    padding-top: 20px;
+    display: flex;
+    gap: 20px;
+
+    button {
+        border-radius: 5px;
+        padding-block: 0.6rem;
+        padding-inline: 1rem;
+    }
+}

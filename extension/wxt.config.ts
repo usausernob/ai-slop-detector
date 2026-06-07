@@ -4,6 +4,6 @@ import { defineConfig } from "wxt";
 export default defineConfig({
 	srcDir: "src",
 	manifest: {
-		permissions: ["contextMenus", "notifications"],
+		permissions: ["activeTab", "contextMenus", "notifications"],
 	},
 });
