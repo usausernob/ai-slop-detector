@@ -1,3 +1,5 @@
+import { CheckResult, UploadedFile, ExtensionAction } from "@/utils/constants";
+
 type MediaType = "image" | "audio" | "video";
 
 interface SelectedFile {
@@ -30,7 +32,7 @@ const DROP_TITLES: Record<MediaType, string> = {
 	video: "Seret file video ke sini",
 };
 
-const MAX_SIZE_MB = 10 // 10 MB, i dont want overload my server
+const MAX_SIZE_MB = 10; // 10 MB, i dont want overload my server
 const MAX_SIZE = MAX_SIZE_MB * 1024 * 1024;
 
 let activeTab: MediaType = "image";
@@ -52,6 +54,14 @@ const processBtnLabel = document.getElementById(
 ) as HTMLSpanElement;
 const toast = document.getElementById("toast") as HTMLDivElement;
 
+// Result DOM elements
+const resultCard = document.getElementById("resultCard") as HTMLDivElement;
+const resultStatusIcon = document.getElementById("resultStatusIcon") as HTMLDivElement;
+const resultTitle = document.getElementById("resultTitle") as HTMLHeadingElement;
+const resultDesc = document.getElementById("resultDesc") as HTMLParagraphElement;
+const confidenceValue = document.getElementById("confidenceValue") as HTMLSpanElement;
+const confidenceBar = document.getElementById("confidenceBar") as HTMLDivElement;
+
 function cloneTemplate(id: string): DocumentFragment {
 	return (document.getElementById(id) as HTMLTemplateElement).content.cloneNode(
 		true,
@@ -72,7 +82,6 @@ function showToast(msg: string): void {
 	clearTimeout(toastTimer);
 	toastTimer = setTimeout(() => toast.classList.remove("show"), 3000);
 }
-
 
 function setActiveTab(type: MediaType): void {
 	activeTab = type;
@@ -98,7 +107,6 @@ function setActiveTab(type: MediaType): void {
 	if (current) clearSelection();
 }
 
-
 function clearSelection(): void {
 	if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
 	current = null;
@@ -107,6 +115,7 @@ function clearSelection(): void {
 
 	fileCard.hidden = true;
 	processBtn.disabled = true;
+	hideResult();
 }
 
 function selectFile(file: File): void {
@@ -124,16 +133,17 @@ function selectFile(file: File): void {
 		previewUrl: URL.createObjectURL(file),
 	};
 
+	hideResult();
 	renderCard();
 }
 
 function validate(file: File): string | null {
 	if (!ACCEPTED[activeTab].includes(file.type))
 		return `Format tidak valid. Gunakan ${FORMAT_LABELS[activeTab].join(", ")}.`;
-	if (file.size > MAX_SIZE) return `Ukuran file melebihi batas ${MAX_SIZE_MB} MB.`;
+	if (file.size > MAX_SIZE)
+		return `Ukuran file melebihi batas ${MAX_SIZE_MB} MB.`;
 	return null;
 }
-
 
 function renderCard(): void {
 	if (!current) return;
@@ -180,20 +190,80 @@ function renderCard(): void {
 	processBtn.disabled = false;
 }
 
+function showResult(payload: any): void {
+	if (!payload) return;
+
+	if (payload.status === "error") {
+		showToast(`Gagal memproses file: ${payload.error || "Unknown error"}`);
+		hideResult();
+		return;
+	}
+
+	const result = payload.result as CheckResult | undefined;
+	if (!result) return;
+
+	resultCard.classList.remove("state-placeholder", "state-loading", "state-ai", "state-human");
+
+	if (result.is_ai) {
+		resultCard.classList.add("state-ai");
+		resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-ai"));
+		resultTitle.textContent = "Terdeteksi AI";
+		resultDesc.textContent = "Berkas ini terindikasi kuat dihasilkan atau dimanipulasi menggunakan kecerdasan buatan (AI).";
+	} else {
+		resultCard.classList.add("state-human");
+		resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-human"));
+		resultTitle.textContent = "Terdeteksi Manusia / Asli";
+		resultDesc.textContent = "Berkas ini terindikasi merupakan karya asli manusia tanpa rekayasa AI generatif.";
+	}
+
+	const pct = Math.round(result.confidence * 100);
+	confidenceValue.textContent = `${pct}%`;
+	
+	confidenceBar.style.width = "0%";
+
+	requestAnimationFrame(() => {
+		confidenceBar.style.width = `${pct}%`;
+	});
+}
+
+function showLoading(): void {
+	resultCard.className = "result-card state-loading";
+	resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-loading"));
+	resultTitle.textContent = "Menganalisis berkas...";
+	resultDesc.textContent = "Mengunggah berkas ke server dan memproses hasil deteksi AI...";
+	confidenceValue.textContent = "0%";
+	confidenceBar.style.width = "0%";
+}
+
+function hideResult(): void {
+	resultCard.className = "result-card state-placeholder";
+	resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-placeholder"));
+	resultTitle.textContent = "Belum ada analisis";
+	resultDesc.textContent = "Silakan pilih berkas di atas lalu klik 'Check File' untuk memulai proses deteksi.";
+	confidenceValue.textContent = "0%";
+	confidenceBar.style.width = "0%";
+}
 
 async function processFile(): Promise<void> {
 	if (!current) return;
 
 	processBtn.disabled = true;
 	processBtnLabel.textContent = "Melakukan Check…";
+	showLoading();
 
-	// TODO: offload to background script
-	await new Promise((r) => setTimeout(r, 1800));
+	const file = current.file;
+	if (!file) return;
 
-	processBtnLabel.textContent = "Check File";
-	processBtn.disabled = false;
+	const arrayBuffer = await file.arrayBuffer();
+	await browser.runtime.sendMessage<{ action: string; payload: UploadedFile }>({
+		action: ExtensionAction.CHECK_UPLOAD_FILE,
+		payload: {
+			buffer: Array.from(new Uint8Array(arrayBuffer)),
+			filename: file.name,
+			mimeType: file.type,
+		},
+	});
 }
-
 
 dropZone.addEventListener("dragover", (e) => {
 	e.preventDefault();
@@ -233,5 +303,12 @@ document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
 	});
 });
 
+browser.runtime.onMessage.addListener((message) => {
+	if (message.action !== ExtensionAction.CHECK_UPLOAD_FILE_RESULT) return;
+
+	processBtnLabel.textContent = "Check File";
+	processBtn.disabled = false;
+	showResult(message.payload);
+});
 
 setActiveTab("image");
