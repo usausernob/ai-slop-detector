@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.post("/")
 @limiter.limit("5/minute")
-async def analyze_image(
+async def analyze_video(
     request: Request,
     file: UploadFile,
     background_task: BackgroundTasks,
@@ -33,7 +33,7 @@ async def analyze_image(
 
 @router.post("/url")
 @limiter.limit("5/minute")
-def analyze_image_url(
+def analyze_video_url(
     request: Request,
     item: UrlRequest,
     background_task: BackgroundTasks,

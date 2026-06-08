@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Response
 
-from app.api.v1 import image_handler
+from app.api.v1 import image_handler, audio_handler, video_handler
 from app.types import StatusEnum, StatusTask
 from app.redis_client import get_task
 
@@ -22,3 +22,5 @@ def get_task_status(task_id: str, response: Response) -> StatusTask:
 
 
 router.include_router(image_handler.router, prefix="/image-analyze", tags=["image"])
+router.include_router(audio_handler.router, prefix="/audio-analyze", tags=["audio"])
+router.include_router(video_handler.router, prefix="/video-analyze", tags=["video"])

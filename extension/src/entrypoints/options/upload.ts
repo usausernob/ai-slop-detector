@@ -3,33 +3,33 @@ import { CheckResult, UploadedFile, ExtensionAction } from "@/utils/constants";
 type MediaType = "image" | "audio" | "video";
 
 interface SelectedFile {
-	file: File;
-	type: MediaType;
-	previewUrl: string;
+    file: File;
+    type: MediaType;
+    previewUrl: string;
 }
 
 const ACCEPTED: Record<MediaType, string[]> = {
-	image: [
-		"image/jpeg",
-		"image/png",
-		"image/gif",
-		"image/webp",
-		"image/svg+xml",
-	],
-	audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac", "audio/aac"],
-	video: ["video/mp4", "video/webm", "video/ogg", "video/mov", "video/avi"],
+    image: [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+    ],
+    audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac", "audio/aac"],
+    video: ["video/mp4", "video/webm", "video/ogg", "video/mov", "video/avi"],
 };
 
 const FORMAT_LABELS: Record<MediaType, string[]> = {
-	image: ["JPG", "PNG", "GIF", "WEBP", "SVG"],
-	audio: ["MP3", "WAV", "OGG", "FLAC", "AAC"],
-	video: ["MP4", "WEBM", "MOV", "AVI"],
+    image: ["JPG", "PNG", "GIF", "WEBP", "SVG"],
+    audio: ["MP3", "WAV", "OGG", "FLAC", "AAC"],
+    video: ["MP4", "WEBM", "MOV", "AVI"],
 };
 
 const DROP_TITLES: Record<MediaType, string> = {
-	image: "Seret gambar ke sini",
-	audio: "Seret file audio ke sini",
-	video: "Seret file video ke sini",
+    image: "Seret gambar ke sini",
+    audio: "Seret file audio ke sini",
+    video: "Seret file video ke sini",
 };
 
 const MAX_SIZE_MB = 10; // 10 MB, i dont want overload my server
@@ -50,265 +50,286 @@ const fileMeta = document.getElementById("fileMeta") as HTMLDivElement;
 const changeBtn = document.getElementById("changeBtn") as HTMLButtonElement;
 const processBtn = document.getElementById("processBtn") as HTMLButtonElement;
 const processBtnLabel = document.getElementById(
-	"processBtnLabel",
+    "processBtnLabel",
 ) as HTMLSpanElement;
 const toast = document.getElementById("toast") as HTMLDivElement;
 
 // Result DOM elements
 const resultCard = document.getElementById("resultCard") as HTMLDivElement;
-const resultStatusIcon = document.getElementById("resultStatusIcon") as HTMLDivElement;
-const resultTitle = document.getElementById("resultTitle") as HTMLHeadingElement;
-const resultDesc = document.getElementById("resultDesc") as HTMLParagraphElement;
-const confidenceValue = document.getElementById("confidenceValue") as HTMLSpanElement;
-const confidenceBar = document.getElementById("confidenceBar") as HTMLDivElement;
+const resultStatusIcon = document.getElementById(
+    "resultStatusIcon",
+) as HTMLDivElement;
+const resultTitle = document.getElementById(
+    "resultTitle",
+) as HTMLHeadingElement;
+const resultDesc = document.getElementById(
+    "resultDesc",
+) as HTMLParagraphElement;
+const confidenceValue = document.getElementById(
+    "confidenceValue",
+) as HTMLSpanElement;
+const confidenceBar = document.getElementById(
+    "confidenceBar",
+) as HTMLDivElement;
 
 function cloneTemplate(id: string): DocumentFragment {
-	return (document.getElementById(id) as HTMLTemplateElement).content.cloneNode(
-		true,
-	) as DocumentFragment;
+    return (document.getElementById(id) as HTMLTemplateElement).content.cloneNode(
+        true,
+    ) as DocumentFragment;
 }
 
 function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0 B";
-	const sizes = ["B", "KB", "MB", "GB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	return `${parseFloat((bytes / 1024 ** i).toFixed(1))} ${sizes[i]}`;
+    if (bytes === 0) return "0 B";
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${parseFloat((bytes / 1024 ** i).toFixed(1))} ${sizes[i]}`;
 }
 
 let toastTimer: ReturnType<typeof setTimeout>;
 function showToast(msg: string): void {
-	toast.textContent = msg;
-	toast.classList.add("show");
-	clearTimeout(toastTimer);
-	toastTimer = setTimeout(() => toast.classList.remove("show"), 3000);
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
 function setActiveTab(type: MediaType): void {
-	activeTab = type;
+    activeTab = type;
 
-	document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
-		btn.classList.toggle("active", btn.dataset.type === type);
-	});
+    document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.type === type);
+    });
 
-	dropIcon.className = `drop-icon ${type}`;
-	dropIcon.replaceChildren(cloneTemplate(`tpl-icon-${type}`));
-	dropTitle.textContent = DROP_TITLES[type];
-	fileInput.accept = ACCEPTED[type].join(",");
+    dropIcon.className = `drop-icon ${type}`;
+    dropIcon.replaceChildren(cloneTemplate(`tpl-icon-${type}`));
+    dropTitle.textContent = DROP_TITLES[type];
+    fileInput.accept = ACCEPTED[type].join(",");
 
-	formatTags.replaceChildren(
-		...FORMAT_LABELS[type].map((label) => {
-			const span = document.createElement("span");
-			span.className = "format-tag";
-			span.textContent = label;
-			return span;
-		}),
-	);
+    formatTags.replaceChildren(
+        ...FORMAT_LABELS[type].map((label) => {
+            const span = document.createElement("span");
+            span.className = "format-tag";
+            span.textContent = label;
+            return span;
+        }),
+    );
 
-	if (current) clearSelection();
+    if (current) clearSelection();
 }
 
 function clearSelection(): void {
-	if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
-	current = null;
+    if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+    current = null;
 
-	document.getElementById("audioPlayerRow")?.remove();
+    document.getElementById("audioPlayerRow")?.remove();
 
-	fileCard.hidden = true;
-	processBtn.disabled = true;
-	hideResult();
+    fileCard.hidden = true;
+    processBtn.disabled = true;
+    hideResult();
 }
 
 function selectFile(file: File): void {
-	const err = validate(file);
-	if (err) {
-		showToast(err);
-		return;
-	}
+    const err = validate(file);
+    if (err) {
+        showToast(err);
+        return;
+    }
 
-	if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+    if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
 
-	current = {
-		file,
-		type: activeTab,
-		previewUrl: URL.createObjectURL(file),
-	};
+    current = {
+        file,
+        type: activeTab,
+        previewUrl: URL.createObjectURL(file),
+    };
 
-	hideResult();
-	renderCard();
+    hideResult();
+    renderCard();
 }
 
 function validate(file: File): string | null {
-	if (!ACCEPTED[activeTab].includes(file.type))
-		return `Format tidak valid. Gunakan ${FORMAT_LABELS[activeTab].join(", ")}.`;
-	if (file.size > MAX_SIZE)
-		return `Ukuran file melebihi batas ${MAX_SIZE_MB} MB.`;
-	return null;
+    if (!ACCEPTED[activeTab].includes(file.type))
+        return `Format tidak valid. Gunakan ${FORMAT_LABELS[activeTab].join(", ")}.`;
+    if (file.size > MAX_SIZE)
+        return `Ukuran file melebihi batas ${MAX_SIZE_MB} MB.`;
+    return null;
 }
 
 function renderCard(): void {
-	if (!current) return;
+    if (!current) return;
 
-	fileName.textContent = current.file.name;
-	fileMeta.textContent = `${formatBytes(current.file.size)} · ${current.file.type}`;
+    fileName.textContent = current.file.name;
+    fileMeta.textContent = `${formatBytes(current.file.size)} · ${current.file.type}`;
 
-	filePreview.className = `file-preview ${current.type}`;
+    filePreview.className = `file-preview ${current.type}`;
 
-	if (current.type === "image") {
-		const frag = cloneTemplate("tpl-preview-image");
-		const img = frag.querySelector("img") as HTMLImageElement;
-		img.src = current.previewUrl;
-		filePreview.replaceChildren(frag);
-	} else if (current.type === "video") {
-		const frag = cloneTemplate("tpl-preview-video");
-		const vid = frag.querySelector("video") as HTMLVideoElement;
-		vid.src = current.previewUrl;
-		vid.addEventListener("loadedmetadata", () => {
-			vid.currentTime = 1;
-		});
-		filePreview.replaceChildren(frag);
-	} else {
-		const frag = cloneTemplate("tpl-preview-audio");
-		const iconWrap = frag.querySelector(
-			".preview-audio-icon",
-		) as HTMLDivElement;
-		const audioEl = frag.querySelector("audio") as HTMLAudioElement;
+    if (current.type === "image") {
+        const frag = cloneTemplate("tpl-preview-image");
+        const img = frag.querySelector("img") as HTMLImageElement;
+        img.src = current.previewUrl;
+        filePreview.replaceChildren(frag);
+    } else if (current.type === "video") {
+        const frag = cloneTemplate("tpl-preview-video");
+        const vid = frag.querySelector("video") as HTMLVideoElement;
+        vid.src = current.previewUrl;
+        vid.addEventListener("loadedmetadata", () => {
+            vid.currentTime = 1;
+        });
+        filePreview.replaceChildren(frag);
+    } else {
+        const frag = cloneTemplate("tpl-preview-audio");
+        const iconWrap = frag.querySelector(
+            ".preview-audio-icon",
+        ) as HTMLDivElement;
+        const audioEl = frag.querySelector("audio") as HTMLAudioElement;
 
-		iconWrap.appendChild(cloneTemplate("tpl-icon-audio"));
-		audioEl.src = current.previewUrl;
+        iconWrap.appendChild(cloneTemplate("tpl-icon-audio"));
+        audioEl.src = current.previewUrl;
 
-		filePreview.replaceChildren(iconWrap);
+        filePreview.replaceChildren(iconWrap);
 
-		document.getElementById("audioPlayerRow")?.remove();
-		const row = document.createElement("div");
-		row.id = "audioPlayerRow";
-		row.className = "audio-player-row";
-		row.appendChild(audioEl);
-		fileCard.insertAdjacentElement("afterend", row);
-	}
+        document.getElementById("audioPlayerRow")?.remove();
+        const row = document.createElement("div");
+        row.id = "audioPlayerRow";
+        row.className = "audio-player-row";
+        row.appendChild(audioEl);
+        fileCard.insertAdjacentElement("afterend", row);
+    }
 
-	fileCard.hidden = false;
-	processBtn.disabled = false;
+    fileCard.hidden = false;
+    processBtn.disabled = false;
 }
 
 function showResult(payload: any): void {
-	if (!payload) return;
+    if (!payload) return;
 
-	if (payload.status === "error") {
-		showToast(`Gagal memproses file: ${payload.error || "Unknown error"}`);
-		hideResult();
-		return;
-	}
+    if (payload.status === "error") {
+        showToast(`Gagal memproses file: ${payload.error || "Unknown error"}`);
+        hideResult();
+        return;
+    }
 
-	const result = payload.result as CheckResult | undefined;
-	if (!result) return;
+    const result = payload.result as CheckResult | undefined;
+    if (!result) return;
 
-	resultCard.classList.remove("state-placeholder", "state-loading", "state-ai", "state-human");
+    resultCard.classList.remove(
+        "state-placeholder",
+        "state-loading",
+        "state-ai",
+        "state-human",
+    );
 
-	if (result.is_ai) {
-		resultCard.classList.add("state-ai");
-		resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-ai"));
-		resultTitle.textContent = "Terdeteksi AI";
-		resultDesc.textContent = "Berkas ini terindikasi kuat dihasilkan atau dimanipulasi menggunakan kecerdasan buatan (AI).";
-	} else {
-		resultCard.classList.add("state-human");
-		resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-human"));
-		resultTitle.textContent = "Terdeteksi Manusia / Asli";
-		resultDesc.textContent = "Berkas ini terindikasi merupakan karya asli manusia tanpa rekayasa AI generatif.";
-	}
+    if (result.is_ai) {
+        resultCard.classList.add("state-ai");
+        resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-ai"));
+        resultTitle.textContent = "Terdeteksi AI";
+        resultDesc.textContent =
+            "Berkas ini terindikasi kuat dihasilkan atau dimanipulasi menggunakan kecerdasan buatan (AI).";
+    } else {
+        resultCard.classList.add("state-human");
+        resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-human"));
+        resultTitle.textContent = "Terdeteksi Manusia / Asli";
+        resultDesc.textContent =
+            "Berkas ini terindikasi merupakan karya asli manusia tanpa rekayasa AI generatif.";
+    }
 
-	const pct = Math.round(result.confidence * 100);
-	confidenceValue.textContent = `${pct}%`;
-	
-	confidenceBar.style.width = "0%";
+    const pct = Math.round(result.confidence * 100);
+    confidenceValue.textContent = `${pct}%`;
 
-	requestAnimationFrame(() => {
-		confidenceBar.style.width = `${pct}%`;
-	});
+    confidenceBar.style.width = "0%";
+
+    requestAnimationFrame(() => {
+        confidenceBar.style.width = `${pct}%`;
+    });
 }
 
 function showLoading(): void {
-	resultCard.className = "result-card state-loading";
-	resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-loading"));
-	resultTitle.textContent = "Menganalisis berkas...";
-	resultDesc.textContent = "Mengunggah berkas ke server dan memproses hasil deteksi AI...";
-	confidenceValue.textContent = "0%";
-	confidenceBar.style.width = "0%";
+    resultCard.className = "result-card state-loading";
+    resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-loading"));
+    resultTitle.textContent = "Menganalisis berkas...";
+    resultDesc.textContent =
+        "Mengunggah berkas ke server dan memproses hasil deteksi AI...";
+    confidenceValue.textContent = "0%";
+    confidenceBar.style.width = "0%";
 }
 
 function hideResult(): void {
-	resultCard.className = "result-card state-placeholder";
-	resultStatusIcon.replaceChildren(cloneTemplate("tpl-icon-result-placeholder"));
-	resultTitle.textContent = "Belum ada analisis";
-	resultDesc.textContent = "Silakan pilih berkas di atas lalu klik 'Check File' untuk memulai proses deteksi.";
-	confidenceValue.textContent = "0%";
-	confidenceBar.style.width = "0%";
+    resultCard.className = "result-card state-placeholder";
+    resultStatusIcon.replaceChildren(
+        cloneTemplate("tpl-icon-result-placeholder"),
+    );
+    resultTitle.textContent = "Belum ada analisis";
+    resultDesc.textContent =
+        "Silakan pilih berkas di atas lalu klik 'Check File' untuk memulai proses deteksi.";
+    confidenceValue.textContent = "0%";
+    confidenceBar.style.width = "0%";
 }
 
 async function processFile(): Promise<void> {
-	if (!current) return;
+    if (!current) return;
 
-	processBtn.disabled = true;
-	processBtnLabel.textContent = "Melakukan Check…";
-	showLoading();
+    processBtn.disabled = true;
+    processBtnLabel.textContent = "Melakukan Check…";
+    showLoading();
 
-	const file = current.file;
-	if (!file) return;
+    const file = current.file;
+    if (!file) return;
 
-	const arrayBuffer = await file.arrayBuffer();
-	await browser.runtime.sendMessage<{ action: string; payload: UploadedFile }>({
-		action: ExtensionAction.CHECK_UPLOAD_FILE,
-		payload: {
-			buffer: Array.from(new Uint8Array(arrayBuffer)),
-			filename: file.name,
-			mimeType: file.type,
-		},
-	});
+    const arrayBuffer = await file.arrayBuffer();
+    await browser.runtime.sendMessage<{ action: string; payload: UploadedFile }>({
+        action: ExtensionAction.CHECK_UPLOAD_FILE,
+        payload: {
+            buffer: Array.from(new Uint8Array(arrayBuffer)),
+            filename: file.name,
+            mimeType: file.type,
+        },
+    });
 }
 
 dropZone.addEventListener("dragover", (e) => {
-	e.preventDefault();
-	dropZone.classList.add("drag-over");
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
 });
 
 dropZone.addEventListener("dragleave", () =>
-	dropZone.classList.remove("drag-over"),
+    dropZone.classList.remove("drag-over"),
 );
 
 dropZone.addEventListener("drop", (e) => {
-	e.preventDefault();
-	dropZone.classList.remove("drag-over");
-	const file = e.dataTransfer?.files[0];
-	if (file) selectFile(file);
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const file = e.dataTransfer?.files[0];
+    if (file) selectFile(file);
 });
 
 fileInput.addEventListener("change", () => {
-	const file = fileInput.files?.[0];
-	if (file) {
-		selectFile(file);
-		fileInput.value = "";
-	}
+    const file = fileInput.files?.[0];
+    if (file) {
+        selectFile(file);
+        fileInput.value = "";
+    }
 });
 
 changeBtn.addEventListener("click", () => {
-	clearSelection();
-	fileInput.click();
+    clearSelection();
+    fileInput.click();
 });
 
 processBtn.addEventListener("click", processFile);
 
 document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
-	btn.addEventListener("click", () => {
-		const type = btn.dataset.type as MediaType;
-		if (type) setActiveTab(type);
-	});
+    btn.addEventListener("click", () => {
+        const type = btn.dataset.type as MediaType;
+        if (type) setActiveTab(type);
+    });
 });
 
 browser.runtime.onMessage.addListener((message) => {
-	if (message.action !== ExtensionAction.CHECK_UPLOAD_FILE_RESULT) return;
+    if (message.action !== ExtensionAction.CHECK_UPLOAD_FILE_RESULT) return;
 
-	processBtnLabel.textContent = "Check File";
-	processBtn.disabled = false;
-	showResult(message.payload);
+    processBtnLabel.textContent = "Check File";
+    processBtn.disabled = false;
+    showResult(message.payload);
 });
 
 setActiveTab("image");
