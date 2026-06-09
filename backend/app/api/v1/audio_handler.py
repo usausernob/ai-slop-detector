@@ -8,7 +8,7 @@ from app.api.v1.utils import (
     TaskResult,
     UrlRequest,
     donwload_and_run_inference,
-    run_ai_inference,
+    run_audio_inference,
 )
 from app.limiter import limiter
 from app.redis_client import create_task
@@ -27,7 +27,9 @@ async def analyze_audio(
     task_id = str(uuid.uuid4())
     create_task(task_id)
     file_buffer = io.BytesIO(await file.read())
-    background_task.add_task(run_ai_inference, task_id, file_buffer)
+    background_task.add_task(
+        run_audio_inference, task_id, file_buffer, file.content_type or "audio/mpeg"
+    )
     return TaskResult(task_id=task_id)
 
 
@@ -42,6 +44,8 @@ def analyze_audio_url(
     task_id = str(uuid.uuid4())
     create_task(task_id)
 
-    background_task.add_task(donwload_and_run_inference, task_id, item.url)
+    background_task.add_task(
+        donwload_and_run_inference, task_id, item.url, run_audio_inference
+    )
 
     return TaskResult(task_id=task_id)
